@@ -257,8 +257,7 @@ app.post('/getDailyWorks', (req, res) => {
 // API to update a specific job in the dailyworks table
 app.put('/update-job', (req, res) => {
   const {
-    customer_name,
-    job_name,
+    job_id, // Unique identifier for the job
     paper_description,
     binding_amount,
     no_of_impressions,
@@ -266,23 +265,26 @@ app.put('/update-job', (req, res) => {
     paper_amount,
     total_amount,
     payment,
-    balance,
-    date
+    date,
   } = req.body;
 
+  // Validate input
+  if (!job_id) {
+    return res.status(400).json({ error: 'Job ID is required' });
+  }
+
   const query = `
-    UPDATE dailyworks 
-    SET 
-      paper_description = ?, 
-      binding_amount = ?, 
-      no_of_impressions = ?, 
-      impression_amount = ?, 
-      paper_amount = ?, 
-      total_amount = ?, 
-      payment = ?, 
-      balance = ?, 
-      date = ? 
-    WHERE customer_name = ? AND job_name = ?
+    UPDATE dailyworks
+    SET
+      paper_description = ?,
+      binding_amount = ?,
+      no_of_impressions = ?,
+      impression_amount = ?,
+      paper_amount = ?,
+      total_amount = ?,
+      payment = ?,
+      date = ?
+    WHERE job_id = ?
   `;
 
   db.query(
@@ -295,16 +297,19 @@ app.put('/update-job', (req, res) => {
       paper_amount,
       total_amount,
       payment,
-      balance,
       date,
-      customer_name,
-      job_name
+      job_id,
     ],
     (err, result) => {
       if (err) {
         console.error('Error updating record:', err);
         return res.status(500).json({ error: 'Failed to update record' });
       }
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ message: 'No job found with the given Job ID' });
+      }
+
       res.status(200).json({ message: 'Job details updated successfully', affectedRows: result.affectedRows });
     }
   );
