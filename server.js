@@ -13,10 +13,10 @@ app.use(bodyParser.json());
 
 // MySQL connection setup
 const db = mysql.createConnection({
-  host: '198.37.120.210',
-  user: 'icmasaba_southern_user',
-  password: 'm,Jvw}sR[7zi', // Replace with your DB password
-  database: 'icmasaba_southern' // Replace with your DB name
+  host: 'localhost',
+  user: 'root',
+  password: '', // Replace with your DB password
+  database: 'southern' // Replace with your DB name
 });
 
 db.connect(err => {
@@ -347,7 +347,7 @@ app.post("/getDailyWorks", (req, res) => {
   }
 
   const query = `
-    SELECT customer_name, job_name, paper_description, binding_amount,
+    SELECT job_id, customer_name, job_name, paper_description, binding_amount,
            no_of_impressions, impression_amount, paper_amount, total_amount,
            payment, balance, date
     FROM dailyworks
@@ -365,7 +365,27 @@ app.post("/getDailyWorks", (req, res) => {
   });
 });
 
-// Apply payment to jobs in descending order
+// delete Work
+app.delete('/delete-job/:id', (req, res) => {
+  const jobId = req.params.id;
+
+  db.query('DELETE FROM dailyworks WHERE job_id = ?', [jobId], (error, results) => {
+    if (error) {
+      console.error('Error deleting job:', error);
+      return res.status(500).json({ error: 'Failed to delete job' });
+    }
+
+    if (results.affectedRows === 0) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+
+    res.status(200).json({ message: 'Job deleted successfully' });
+  });
+});
+
+
+
+
 // Apply payment to jobs in descending order
 app.post('/apply-payment', async (req, res) => {
   const { customerName, paymentAmount } = req.body;
@@ -646,6 +666,78 @@ app.post('/updatePaymentpaper', (req, res) => {
 });
 
 
+
+
+
+
+// ********************************** DAILY INCOME SUMMERY ********************
+
+
+// Endpoint to fetch daily income for a specific date
+app.get('/daily-income/:date', (req, res) => {
+  const { date } = req.params;
+  const query = `
+    SELECT SUM(payment_amount) AS daily_income 
+    FROM payment_history 
+    WHERE payment_date = ?;
+  `;
+
+  db.query(query, [date], (err, results) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).send('Error fetching daily income');
+    }
+    res.json({ daily_income: results[0].daily_income || 0 });
+  });
+});
+
+// Endpoint to fetch past income summaries
+app.get('/past-income-summaries/:date', (req, res) => {
+  const { date } = req.params;
+
+  // Validate the date format (yyyy-mm-dd)
+  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  if (!dateRegex.test(date)) {
+    return res.status(400).send('Invalid date format. Please use yyyy-mm-dd.');
+  }
+
+  // Query to fetch payment history for the selected date
+  const query = `
+    SELECT customer_name, payment_amount
+    FROM payment_history 
+    WHERE DATE(payment_date) = ?;
+  `;
+
+  db.query(query, [date], (err, results) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).send('Error fetching past income summaries');
+    }
+    res.json(results);
+  });
+});
+
+
+// Endpoint to get monthly income data
+app.get('/monthly-income/:month', (req, res) => {
+  const month = req.params.month; // Expected format: yyyy-mm
+  const query = `
+    SELECT DAY(payment_date) AS day, SUM(payment_amount) AS income
+    FROM payments
+    WHERE payment_date LIKE ?
+    GROUP BY DAY(payment_date)
+    ORDER BY payment_date;
+  `;
+
+  db.query(query, [`${month}%`], (err, result) => {
+    if (err) {
+      console.log(err);
+      res.status(500).json({ error: 'Failed to fetch data' });
+    } else {
+      res.json(result);
+    }
+  });
+});
 
 
 // Start the server
